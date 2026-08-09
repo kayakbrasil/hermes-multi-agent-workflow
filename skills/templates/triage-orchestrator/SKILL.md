@@ -1,105 +1,116 @@
 ---
 name: triage-orchestrator
 description: >
-  The pipeline driver for the Hermes Multi-Agent Workflow. Triggered by new `intake`
-  tasks on the triage board. Dedups, scores, fans out research, routes, proposes
-  at the human gate, and on approval lets the engine spawn the fulfillment chain.
-  It is DELIBERATELY THIN: it calls engine/* for every deterministic step and
-  only supplies judgment (scoring, classification, proposal prose).
+  The pipeline driver for personal software projects. It processes manual V1
+  intake tasks, scores, researches, routes, proposes, and starts approved work.
 metadata:
   hermes:
-    tags: [triage, orchestrator]
+    tags: [triage, orchestrator, software-projects]
 ---
 
-# Triage orchestrator (thin driver)
+# Project orchestrator (thin driver)
 
-> **Design contract:** fat engine, thin skill. Anything deterministic —
-> dedup lookup, applying the score threshold, route resolution, building research
-> fan-out, building the prep/fulfillment chains, choosing workspaces — is a call
-> into `engine/`. You (the model) only do what needs judgment. Do NOT re-derive
-> the pipeline shape in prose here; it lives in `triage.yaml`. Read
-> `docs/01-architecture.md` and `docs/05-pipeline-stages.md`.
+> **Design contract:** fat engine, thin skill. Use `engine/` for deterministic
+> deduplication, score validation, task-chain construction, workspace selection,
+> and routing. Supply only judgment: rubric scoring, research interpretation,
+> classification, architecture synthesis, and proposal prose.
 
-All commands below run from the repo root with `triage.yaml` present.
-`TRIAGE_CONFIG`, `TRIAGE_VAULT_DIR`, and `HERMES_KANBAN_DB` are honored.
+V1 uses a manually created `intake` Kanban task whose body is the path to a
+report formatted by `skills/templates/project-intake/SKILL.md`. Do not create
+scouts, cron jobs, profiles, messaging integrations, GitHub automation,
+deployments, or production integrations as part of this workflow.
 
-## Trigger
-
-A new `intake` task assigned to you appears on the triage board. Its body is a
-path to a scout report.
+All commands run from the repository root with `triage.yaml` present.
 
 ## Procedure
 
-### 1. Parse intake
-Read the report file. Parse it into candidates (`engine/intake_parser.py` shape).
+### 1. Parse and persist intake
 
-### 2. Dedup (deterministic — call the engine)
-For each candidate, ask the engine for similar existing items:
+Read the report and parse it with `engine.intake_parser.parse_intake_report()`.
+For each new candidate, create a vault item with its engine-required fields and
+generic metadata:
+
+```python
+item = engine.vault.create_item(
+    slug=<slug>,
+    title=candidate.title,
+    sources=candidate.sources,
+    body=<intake summary>,
+    attributes=candidate.attributes,
+)
 ```
-python -c "from engine.config import TriageConfig; from engine.engine import TriageEngine; \
-import json,sys; e=TriageEngine(TriageConfig.load()); \
-print(json.dumps([m.__dict__ for m in e.dedup(sys.argv[1])]))" "<candidate title + claim>"
+
+`Attributes:` metadata is generic and persisted in item frontmatter. The
+`project_type_hint` is only the submitter's expectation; do not route from it.
+
+### 2. Deduplicate and score
+
+Use `TriageEngine.dedup()` for every candidate. For new items, use
+`TriageEngine.rubric_prompt()` and score the configured dimensions honestly.
+Pass the breakdown to `TriageEngine.score()` and save the result on the item.
+
+- Below threshold: shelve without a proposal.
+- At or above threshold: continue to research.
+
+### 3. Research fan-out and authoritative classification
+
+Create the triage root task and use `TriageEngine.research_specs()` to build the
+parallel research lanes. The `project_classification` lane must emit exactly one
+configured value at `project_classification.project_type`:
+
+- `website`, `web_app`, `mobile_app`, or `automation` → `software_project`
+- `research_only` → `research_only`
+- `shelve` → `shelve`
+
+Use `TriageEngine.route()` to resolve the emitted classification. Never route
+from `project_type_hint` alone.
+
+### 4. Pre-gate synthesis, architecture, and proposal
+
+Use `TriageEngine.prep_specs()` for the selected path. The software-project
+chain is `requirements_synthesis` then `solution_architecture`; the built-in
+`propose` step is the implementation proposal and must not be duplicated as a
+prep stage.
+
+Draft the selected proposal template after prep completes. Record:
+
+- complexity: low / medium / high
+- implementation effort: small / medium / large
+- expected external costs: none / low / medium / high
+- confidence: low / medium / high
+- major uncertainties
+
+Do not present precise LLM-generated time estimates. Set item status to
+`awaiting_approval` and present the proposal through the manually handled V1
+gate. Never auto-approve.
+
+### 5. Approval and fulfillment
+
+When the human provides an approval, modification, or shelving instruction, use
+the existing `proposal_actions.py` handler. On approval it creates the shared,
+persistent post-gate chain. Do not change that workspace to scratch.
+
+For `software_project`, the fulfillment stages are:
+
 ```
-- `duplicate` → append the new source to the existing item, stop. Don't re-research.
-- `possible` → note it, continue, re-check after research.
-- `new` → create a vault item (`ItemVault.create_item`) with `status: triage`.
-
-### 3. Score (judgment + engine validation)
-This is YOUR judgment. Get the rubric prompt from the engine
-(`TriageEngine.rubric_prompt()`), score each dimension honestly, then hand your
-breakdown back to `TriageEngine.score(breakdown)` to apply the maxes + threshold.
-Write `score` / `score_breakdown` to the item file regardless of outcome.
-- Below threshold → shelve automatically. **Do not bother the human.**
-- At/above → continue.
-
-(For a deterministic/offline pass you may instead call
-`TriageEngine.score_heuristic(candidate)` — see engine/scoring.py.)
-
-### 4. Research fan-out (engine builds the cards)
-Create one triage root task, then create the research lane cards from
-`TriageEngine.research_specs(slug, triage_id)` — they run in parallel, all
-parented to the triage task. Create a single `route` card parented to ALL lanes
-so the kernel fires it the instant the last lane finishes (fan-in). Assign the
-`route` card back to yourself.
-
-### 5. Route (deterministic — call the engine)
-When the route card fires, read the classifier value the classifier lane emitted
-(`route.classifier` in triage.yaml). Resolve the path:
-`TriageEngine.route(classification)` → a path name. Write `path: <name>` on the
-item. If the path is `auto` (e.g. `shelve`), close out — no proposal.
-
-### 6. Prep + propose (engine builds prep; you write the proposal)
-Spawn the path's prep chain from `TriageEngine.prep_specs(slug, path)`. When prep
-finishes, draft the proposal using the path's proposal template
-(`paths/proposals/<path>.md`), set item `status: awaiting_approval`, and **send it
-to the human** — you MUST actually deliver it:
+development → testing → review → documentation_delivery
 ```
-hermes send --to telegram --file <proposal.md>
-```
-Setting status is NOT delivery. (See docs/06 + the runbook.) Then move on to
-other items while waiting — the gate is non-blocking.
 
-### 7. Gate (human replies; you shell to the handler)
-Map the human's reply verb (see `gate:` in triage.yaml — NO leading slash) to:
-```
-python proposal_actions.py approve     <slug>
-python proposal_actions.py shelve      <slug> --reason "..."
-python proposal_actions.py shelve-all  [--except <slug>]
-python proposal_actions.py modify      <slug> --change "..."
-```
-On `approve`, the handler reads `paths.<path>.fulfill` from triage.yaml and
-spawns the post-gate chain in a shared persistent workspace. You do nothing else.
+For `research_only`, they are:
 
-### 8. Deliver
-When the final fulfillment stage completes, DM the deliverable to the human
-(`hermes send --to telegram --file <deliverable>`).
+```
+research → review → documentation_delivery
+```
+
+Workers must obey the inlined scope rails and deliverable specifications. The
+final delivery stage produces the required record in the persistent workspace;
+it does not deploy, publish, push, or configure external delivery systems.
 
 ## Rules
 
-- Narrate one line per decision to Telegram so the human has a pulse.
-- Never auto-approve. The gate is real.
-- Only YOU write vault item files and create child tasks. Workers don't fan out.
-- Be honest in scoring/classification — gaming them wastes the human's one tap
-  and produces low-value output.
-- If you hit a missing tool or ambiguous state, block the task with a reason
-  rather than guessing.
+- Only the orchestrator writes vault item files and creates child tasks.
+- Do not fabricate sources, test results, review outcomes, or external actions.
+- Respect `paths/rails/*.md`, especially the Git, secret, repository, and Hermes
+  configuration protections.
+- If a task requires an unapproved external repository, deployment, credential,
+  or broader scope, block it and explain why instead of guessing.

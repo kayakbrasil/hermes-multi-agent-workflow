@@ -66,6 +66,7 @@ class ItemVault:
         sources: list[dict[str, Any]],
         body: str,
         embedding: list[float] | None = None,
+        attributes: dict[str, Any] | None = None,
     ) -> Item:
         path = self.item_path(slug)
         if path.exists():
@@ -86,6 +87,11 @@ class ItemVault:
             "linked_kanban_tasks": [],
             "cost_spent_usd": 0.0,
         }
+        # Intake attributes are domain-defined metadata. Never let them replace
+        # the engine-owned item spine above.
+        for key, value in (attributes or {}).items():
+            if key not in fm:
+                fm[key] = value
         item = Item(path=path, frontmatter=fm, body=body)
         self.save(item)
         return item

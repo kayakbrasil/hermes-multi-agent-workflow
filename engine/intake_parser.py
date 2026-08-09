@@ -1,10 +1,10 @@
-"""Parse a scout's intake report into structured candidates.
+"""Parse an intake report into structured candidates.
 
-A scout (see `skills/templates/triage-scout/SKILL.md`) writes a markdown report
-to `vault/intake/<ts>-<source>.md`. This parser turns that report into
+A manual intake mechanism or future source integration writes a markdown report
+to the intake vault. This parser turns that report into
 `Candidate` objects the orchestrator can dedup and score.
 
-The report FORMAT is a contract between the scout skill and this parser. The
+The report FORMAT is a contract between the intake producer and this parser. The
 default format below is simple and LLM-friendly:
 
     @optional-mention
@@ -16,10 +16,13 @@ default format below is simple and LLM-friendly:
       - url: https://...
         quote: "verbatim quote"
     Why it may matter: <one line>
+    Attributes:
+      any_domain_key: value
 
 If you change the fields a scout emits (see `item_schema` in triage.yaml), keep
-this parser and the scout skill in sync. The three fields the rest of the engine
-relies on are `title`, `claim`, and `sources`.
+this parser and the scout skill in sync. The three fields the rest of the engine relies on are `title`, `claim`, and
+`sources`. Optional `Attributes:` entries are generic domain metadata that the
+orchestrator can persist alongside the engine-owned item frontmatter.
 """
 from __future__ import annotations
 
@@ -32,6 +35,7 @@ class Candidate:
     claim: str = ""
     sources: list[dict[str, str]] = field(default_factory=list)
     why_it_may_matter: str = ""
+    attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -48,6 +52,7 @@ def parse_intake_report(text: str) -> IntakeReport:
     candidates: list[Candidate] = []
     current: Candidate | None = None
     in_sources = False
+    in_attributes = False
     current_source: dict[str, str] | None = None
 
     for raw in lines:
@@ -65,6 +70,7 @@ def parse_intake_report(text: str) -> IntakeReport:
             current = Candidate(title=stripped.split(":", 1)[1].strip())
             candidates.append(current)
             in_sources = False
+            in_attributes = False
             continue
         if current is None:
             if ":" in stripped and not stripped.startswith("#"):
@@ -74,14 +80,26 @@ def parse_intake_report(text: str) -> IntakeReport:
         if stripped.startswith("Claim:"):
             current.claim = stripped.split(":", 1)[1].strip()
             in_sources = False
+            in_attributes = False
         elif stripped == "Sources:":
             in_sources = True
+            in_attributes = False
         elif stripped.startswith("Why it may matter:"):
             if current_source is not None:
                 current.sources.append(current_source)
                 current_source = None
             current.why_it_may_matter = stripped.split(":", 1)[1].strip()
             in_sources = False
+            in_attributes = False
+        elif stripped == "Attributes:":
+            if current_source is not None:
+                current.sources.append(current_source)
+                current_source = None
+            in_sources = False
+            in_attributes = True
+        elif in_attributes and raw[:1].isspace() and ":" in stripped:
+            key, value = stripped.split(":", 1)
+            current.attributes[key.strip()] = value.strip().strip('"')
         elif in_sources and stripped.startswith("- "):
             if current_source is not None:
                 current.sources.append(current_source)

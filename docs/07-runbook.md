@@ -51,8 +51,9 @@ Also ensure scouts have a web-search backend (a Tavily/Serper/Brave key in their
 
 - Copy `skills/templates/triage-orchestrator/` to the orchestrator profile's
   skills dir.
-- Copy `skills/templates/triage-scout/` once per source to that source's profile,
-  renamed to `sources[].skill`, with the source's `query` filled in.
+- This V1 workflow has no source profiles or scout crons. Use
+  `skills/templates/project-intake/` to create the temporary manual report and
+  intake task. Future source integrations can add source-specific skills then.
 
 ## 6. Auth
 

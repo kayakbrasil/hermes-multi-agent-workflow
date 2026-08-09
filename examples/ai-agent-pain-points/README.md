@@ -23,10 +23,11 @@ every config block. For a full architectural write-up of the origin system, see
 ## Reference skill (a real, filled-in scout)
 
 `reference-skills/pain-point-scout-x/SKILL.md` is the **actual** X/Grok scout from
-the live system, included verbatim (lightly sanitized). Read it alongside the
-generic `skills/templates/triage-scout/SKILL.md` to see exactly how a template
-gets filled in for a real source — the search query, the report format, and the
-`kanban_create` call that maps back to `triage.yaml`.
+the live system, included verbatim (lightly sanitized). It is a historical
+source-driven example: the current V1 workflow uses
+`skills/templates/project-intake/SKILL.md` and manual intake instead. The
+reference shows the search query, report format, and `kanban_create` call from
+the original pipeline.
 
 ## Use it as a starting point
 

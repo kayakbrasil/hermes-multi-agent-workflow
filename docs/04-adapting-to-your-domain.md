@@ -64,9 +64,9 @@ set in `triage.yaml`.
 
 ## Step 4 — Rewrite the skills (`skills/templates/`)
 
-- **Scout(s):** copy `triage-scout/SKILL.md` once per source, name each to match
-  `sources[].skill`, and paste that source's `query` into "What to look for."
-  Keep the report format in sync with `item_schema` and `intake_parser.py`.
+- **Manual V1 intake:** use `project-intake/SKILL.md` to create the report and
+  intake task. Future source-specific scouts should keep their report format in
+  sync with `item_schema` and `intake_parser.py`.
 - **Orchestrator:** `triage-orchestrator/SKILL.md` is already thin and
   config-driven. Adjust only the domain-flavored wording (what to dedup on, how to
   phrase proposals). Don't move deterministic logic back into it.

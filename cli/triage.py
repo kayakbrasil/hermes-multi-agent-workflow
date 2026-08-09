@@ -64,19 +64,26 @@ def cmd_scaffold(args: argparse.Namespace) -> int:
     for prof in profiles:
         print(f"hermes profile create {prof} --from <base-profile>   # TODO: set model in {prof}/config.yaml")
     print()
-    print(f"# 3. Source profiles need the `kanban` toolset (they run via cron, not the dispatcher)")
-    for s in cfg.sources:
-        print(f"#   edit ~/.hermes/profiles/{s.profile}/config.yaml → toolsets: [hermes-cli, kanban]")
-    print()
-    print(f"# 4. Install skills: copy skills/templates/triage-orchestrator → orchestrator profile,")
-    print(f"#    and triage-scout → each source profile (rename per source).")
-    for s in cfg.sources:
-        print(f"#   {s.skill} → profile {s.profile}")
-    print()
-    print(f"# 5. Register scout crons in the GATEWAY profile's store (v0.15.0+ reads only that store)")
-    for s in cfg.sources:
-        print(f"orchestrator cron create '{s.schedule}' --profile {s.profile} --skill {s.skill}   # TODO confirm flags")
-    print()
+    if cfg.sources:
+        print(f"# 3. Source profiles need the `kanban` toolset (they run via cron, not the dispatcher)")
+        for s in cfg.sources:
+            print(f"#   edit ~/.hermes/profiles/{s.profile}/config.yaml → toolsets: [hermes-cli, kanban]")
+        print()
+        print(f"# 4. Install skills: copy skills/templates/triage-orchestrator → orchestrator profile,")
+        print(f"#    and the configured scout skill → each source profile (rename per source).")
+        for s in cfg.sources:
+            print(f"#   {s.skill} → profile {s.profile}")
+        print()
+        print(f"# 5. Register scout crons in the GATEWAY profile's store (v0.15.0+ reads only that store)")
+        for s in cfg.sources:
+            print(f"orchestrator cron create '{s.schedule}' --profile {s.profile} --skill {s.skill}   # TODO confirm flags")
+        print()
+    else:
+        print("# 3. No source profiles or scout crons are configured.")
+        print("# 4. Install skills: copy skills/templates/triage-orchestrator → orchestrator profile.")
+        print("#    Use the workflow's manual intake template until a direct intake integration is added.")
+        print("# 5. No scout crons to register for this manual-intake workflow.")
+        print()
     print(f"# 6. Start the runtime (WSL: foreground):  orchestrator gateway run")
     print(f"# See docs/07-runbook.md for the full go-live sequence.")
     return 0

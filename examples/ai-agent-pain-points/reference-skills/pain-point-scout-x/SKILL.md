@@ -15,8 +15,8 @@ REFERENCE — REAL SCOUT FROM THE LIVE PIPELINE.
 
 This is the actual `pain-point-scout-x` skill from the system this template was
 extracted from, included verbatim (lightly sanitized: one absolute machine path
-genericized) so you can see a concrete, filled-in scout next to the generic
-template at `skills/templates/triage-scout/SKILL.md`.
+genericized). It is retained as a historical source-driven example; the current
+V1 workflow uses `skills/templates/project-intake/SKILL.md` and manual intake.
 
 How it maps to the template / triage.yaml:
   - It is one copy of the scout template, named per a `sources[]` entry.
