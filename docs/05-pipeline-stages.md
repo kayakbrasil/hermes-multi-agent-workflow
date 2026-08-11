@@ -73,7 +73,9 @@ The human replies (verbs from `gate:`). The orchestrator shells to
 ## Stages 9–11 — Fulfill + deliver
 
 On `approve`, `proposal_actions.py` reads `paths.<path>.fulfill` and spawns the
-chain via `TriageEngine.fulfillment_specs()`.
+chain via `TriageEngine.fulfillment_specs()`. `approved` means authorized/in
+progress. The configured final fulfillment worker records `completed` only after
+its required artifacts, verification, and handoff succeed.
 
 - ⚠️ **Gotcha — persistent workspace.** Every fulfillment stage runs with
   `workspace_kind="dir"` pointed at the SAME `work/<subdir>/<slug>/`. Scratch
@@ -86,10 +88,19 @@ chain via `TriageEngine.fulfillment_specs()`.
 
 ## Cost gate (cross-cutting)
 
-`scripts/cost_report.py <slug>` sums per-item spend from board telemetry and
-compares to `cost_gate_usd`. Over before the gate → pause + ask; over after
-approval → notify + continue. Degrades to "telemetry unavailable" if your Hermes
-build doesn't expose cost columns — adjust the SQL there for your schema.
+`scripts/cost_report.py <slug>` is a diagnostic only in V1. The local Hermes
+Kanban `tasks` and `task_runs` records contain no token or cost columns, and the
+workflow does not persist a reliable task-to-session attribution. Hermes does
+track session token/cost data separately, but this template cannot safely assign
+those sessions to a Kanban item. Therefore `cost_spent_usd: 0.0` is only the
+item's initialization value, not measured spend, and `cost_gate_usd` is currently
+non-operational: it does not pause, notify, or enforce the $5 threshold.
+
+The smallest reliable generic integration is for Hermes to persist the worker
+`session_id` on each `task_runs` row. The report can then sum each linked run's
+`actual_cost_usd` (or explicitly labeled estimated cost when actual cost is
+unavailable), persist that total to the item, and let the orchestrator check the
+configured threshold at its existing pre-gate and post-approval checkpoints.
 
 ## Failure handling
 

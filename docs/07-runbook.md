@@ -123,7 +123,9 @@ The gateway must stay running for cron to fire and the board to dispatch.
 - **Decide:** reply (no slash) `approve <slug>` / `shelve <slug>: reason` /
   `modify <slug>: change`; `reject the rest` (or `python proposal_actions.py
   shelve-all`) clears the queue.
-- **Cost:** `python scripts/cost_report.py <slug> --gate <usd>`.
+- **Cost:** `python scripts/cost_report.py <slug> --gate <usd>` reports
+  "telemetry unavailable" in V1. The configured threshold is not enforced until
+  a reliable task-to-session cost attribution integration is added.
 - **Stop:** Ctrl-C the gateway.
 
 ## Troubleshooting

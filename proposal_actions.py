@@ -6,6 +6,7 @@ the post-gate chain from `triage.yaml` (`paths.<path>.fulfill`), so you do NOT
 edit this file to add or reorder stages — you edit the YAML.
 
     python proposal_actions.py approve     <slug>
+    python proposal_actions.py complete    <slug>
     python proposal_actions.py shelve      <slug> [--reason "..."]
     python proposal_actions.py shelve-all  [--except <slug>] [--reason "..."]
     python proposal_actions.py modify      <slug> --change "..."
@@ -151,6 +152,37 @@ def action_approve(slug: str) -> dict[str, Any]:
             "next_task_id": created[0]["task_id"], "next_assignee": created[0]["assignee"]}
 
 
+def action_complete(slug: str) -> dict[str, Any]:
+    """Record successful completion from the configured final fulfillment stage.
+
+    The final worker invokes this only after its deliverable and handoff are
+    complete. This intentionally records a generic lifecycle transition rather
+    than coupling completion to a particular path or final stage name.
+    """
+    config = load_config()
+    vault = ItemVault(vault_dir(config))
+    item = vault.load(slug)
+    fm, body = item.frontmatter, item.body
+    if fm.get("status") != "approved":
+        die_state(f"Item {slug} is {fm.get('status')!r}; expected 'approved'. Final fulfillment is not active — refusing.")
+    path_name_raw = fm.get("path")
+    if not isinstance(path_name_raw, str):
+        die_state(f"Item {slug} has invalid `path`: {path_name_raw!r}. Known: {sorted(config.paths)}.")
+        return {}
+    path_name = path_name_raw
+    if path_name not in config.paths:
+        die_state(f"Item {slug} has invalid `path`: {path_name!r}. Known: {sorted(config.paths)}.")
+        return {}
+    if not config.get_path(path_name).fulfill:
+        die_state(f"Path {path_name!r} has no `fulfill:` stages; no final fulfillment state exists.")
+
+    fm["status"] = "completed"
+    fm["completed_at"] = utc_now_iso()
+    item.body = append_note(body, "✅ **Fulfillment completed.** The configured final fulfillment stage finished successfully.")
+    vault.save(item)
+    return {"ok": True, "action": "complete", "slug": slug, "path": path_name, "status": "completed"}
+
+
 def action_shelve(slug: str, reason: str | None) -> dict[str, Any]:
     config = load_config()
     vault = ItemVault(vault_dir(config))
@@ -261,6 +293,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="proposal_actions", description="Human-gate action handler (config-driven).")
     sub = parser.add_subparsers(dest="action", required=True)
     p_app = sub.add_parser("approve"); p_app.add_argument("slug")
+    p_cmp = sub.add_parser("complete"); p_cmp.add_argument("slug")
     p_shl = sub.add_parser("shelve"); p_shl.add_argument("slug"); p_shl.add_argument("--reason", default=None)
     p_sha = sub.add_parser("shelve-all")
     p_sha.add_argument("--reason", default="bulk shelved by human")
@@ -271,6 +304,8 @@ def main(argv: list[str] | None = None) -> None:
     try:
         if args.action == "approve":
             result = action_approve(args.slug)
+        elif args.action == "complete":
+            result = action_complete(args.slug)
         elif args.action == "shelve":
             result = action_shelve(args.slug, args.reason)
         elif args.action == "shelve-all":

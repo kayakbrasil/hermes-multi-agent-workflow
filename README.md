@@ -76,7 +76,7 @@ paths/                   Per-path templates you customize
   rails/   specs/   proposals/
 skills/templates/        Scout + orchestrator SKILL.md templates
 cli/triage.py            validate / scaffold / init / install
-scripts/cost_report.py   Per-item spend for the cost gate
+scripts/cost_report.py   Per-item telemetry diagnostic (cost gate is not enforced in V1)
 tests/                   Generic engine tests
 docs/                    Deep-dive docs (architecture, board, config, adapting, …)
 examples/                Reference configs

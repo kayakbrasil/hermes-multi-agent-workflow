@@ -157,14 +157,26 @@ class TriageEngine:
             ws_kind, ws_path = "dir", str(ws_dir)
             ws_note = (
                 f"\nWorkspace: your cwd is the PERSISTENT dir `{ws_path}` (workspace_kind=dir). "
-                "Write ALL artifacts here — never a scratch/tmp dir; later stages read this exact path.\n"
+                "Write ALL artifacts here — never a scratch/tmp dir; later stages read this exact path. "
+                "Before handoff, remove generated caches or build artifacts that are not deliverables when reasonable; "
+                "otherwise leave them untracked/ignored and do not mistake them for delivery artifacts.\n"
             )
         injected = self._injected_constraints(path)
         for i, stage in enumerate(stages):
+            final_note = ""
+            if phase == "fulfill" and i == len(stages) - 1:
+                repo_root = Path(__file__).resolve().parent.parent
+                final_note = (
+                    "\nThis is the configured FINAL fulfillment stage. After all required artifacts, verification, "
+                    "and handoff are complete, record the generic terminal lifecycle state before completing this "
+                    f"card: `cd {repo_root} && python3 proposal_actions.py complete {slug}`. "
+                    "This changes the item from `approved` (authorized/in progress) to `completed`. If safe stage "
+                    "completion is genuinely prevented, document the reason and block instead; do not run the command.\n"
+                )
             body = (
                 f"Stage `{stage.stage}` ({phase}) for item `{slug}` on the `{path_name}` path.\n"
                 f"Read the item file for the approved proposal, sources, score, and human notes.\n"
-                f"{ws_note}{injected}"
+                f"{ws_note}{final_note}{injected}"
             )
             specs.append(TaskSpec(
                 title=f"{stage.stage}: {slug}",

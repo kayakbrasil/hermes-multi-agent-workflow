@@ -85,6 +85,8 @@ class ItemVault:
             "status": "triage",
             "embedding": embedding or [],
             "linked_kanban_tasks": [],
+            # V1 has no task-to-session cost attribution; this is an initialization
+            # placeholder, not measured spend. See scripts/cost_report.py.
             "cost_spent_usd": 0.0,
         }
         # Intake attributes are domain-defined metadata. Never let them replace

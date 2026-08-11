@@ -10,7 +10,7 @@ Every key in `triage.yaml`. The typed view is `engine/config.py`; the validator 
 | `name` | str | Pipeline slug, for logs. |
 | `board` | str | Kanban board slug. `default` → `~/.hermes/kanban.db`; else `~/.hermes/kanban/boards/<board>/kanban.db`. |
 | `workspace_root` | path | Base for the item vault and per-item persistent workspaces. |
-| `cost_gate_usd` | number | Soft per-item LLM budget. Over before gate → pause+notify; over after approval → notify+continue. |
+| `cost_gate_usd` | number | Intended soft per-item LLM budget. V1 has no reliable task-to-session cost attribution, so it is currently informational and does not enforce a threshold. |
 
 ## `sources:` — the scouts
 

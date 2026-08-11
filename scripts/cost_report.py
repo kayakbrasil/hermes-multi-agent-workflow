@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Per-item LLM-spend report for the cost gate.
+"""Per-item LLM-spend diagnostic for a future cost-gate integration.
 
 Walks the triage board for the tasks linked to an item and sums their cost
-telemetry. Used to enforce `cost_gate_usd` from triage.yaml:
-  - over budget BEFORE the gate → orchestrator pauses + notifies
-  - over budget AFTER approval  → orchestrator notifies + continues
+telemetry when the board exposes a cost column. Current Hermes Kanban task/run
+records do not, so this normally reports "telemetry unavailable" and does not
+enforce `cost_gate_usd` or update `cost_spent_usd`.
 
 Usage:
   python scripts/cost_report.py <slug> [--gate 5]   # exits non-zero if over --gate
@@ -21,6 +21,10 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+
+# Support the documented `python scripts/cost_report.py ...` invocation even
+# though Python otherwise puts only scripts/ on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from engine.config import TriageConfig
 from engine.item_vault import ItemVault
@@ -41,9 +45,10 @@ def sum_cost(db: Path, task_ids: list[str]) -> float | None:
         return None
     conn = sqlite3.connect(str(db))
     try:
-        # TODO: adjust to your Hermes telemetry schema. Common shapes:
-        #   tasks.cost_usd, or a task_runs/usage table with a cost column.
-        # We probe for a `cost_usd` column on tasks; absent → telemetry unavailable.
+        # A future integration needs a stable worker-session ID on each task_run, then
+        # can join Hermes session accounting to the item-linked task IDs. We deliberately
+        # do not infer that relationship from timestamps, profiles, or free-text metadata.
+        # Until then, probe only an explicit `tasks.cost_usd` column; absent means unknown.
         cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
         if "cost_usd" not in cols:
             return None

@@ -35,3 +35,15 @@
 Stop and document the mismatch, uncertainty, or dependency for the human. Do not
 expand scope, access another repository, deploy, or weaken these rails to make it
 fit.
+
+## Verification and blocking
+
+Use the available, proportionate verification methods for the approved scope.
+If an optional method (for example, browser visual inspection) is unavailable but
+the implementation, required automated checks, local verification, and structural
+checks are complete, record the limitation and hand it to the dedicated QA or
+review stage. Do not block solely for that optional method.
+
+Block only when a missing requirement, capability, dependency, decision, or human
+input genuinely prevents safe completion of the current stage. Record the exact
+blocker and the evidence already obtained; never claim an unavailable check ran.
